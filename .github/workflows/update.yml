@@ -37,7 +37,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
           publish_branch: gh-pages
-          include_files: index.html
+          exclude_assets: '**.py,**.txt,**.gitignore,**.yml,**.md'
           commit_message: "自動更新：${{ github.run_id }} 台灣時間收盤後"
 
       - name: 發送 Telegram 通知
