@@ -1,0 +1,47 @@
+name: 每日台股收盤更新
+
+on:
+  schedule:
+    # 台灣時間 14:30 = UTC 06:30，每週一到週五執行
+    - cron: '30 6 * * 1-5'
+  # 允許手動觸發（GitHub 網頁上點 Run workflow 即可）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+
+      - name: 執行股價更新，產生 index.html
+        run: python 每日追價.py
+        env:
+          CI: "true"
+
+      - name: 將 index.html 推送到 gh-pages 分支
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: '**.py,**.txt,**.gitignore,**.yml,**.md'
+          commit_message: "自動更新：${{ github.run_id }} 台灣時間收盤後"
+
+      - name: 發送 Telegram 通知
+        run: python send_telegram.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
