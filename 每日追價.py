@@ -32,6 +32,10 @@ STOCKS = [
      "sweet":(160.0,167.0),"entry":(168.0,174.0),"target":(208.0,222.0),"cost":178.15,
      "memo":"FOUP Stocker 家登默契夥伴，半導體設備佔比拉至 50%，EPS 估 9-10"},
 
+    {"code":"3580","name":"友威科",  "group":"一軍","role":"🌙 太陰財庫","ex":"otc","holding":True,
+     "sweet":(90.0,97.0),"entry":(98.0,103.0),"target":(120.0,130.0),"cost":111.5,
+     "memo":"電漿/濺鍍輔助設備，玻璃基板 E-core 2026 H2 受惠，低風險穩健"},
+
     # ─ 二軍（觀察名單，目前未持有）─
     {"code":"6196","name":"帆宣",   "group":"二軍","role":"🛡️ 太陰防禦","ex":"tse","holding":False,
      "sweet":(460.0,480.0),"entry":(485.0,508.0),"target":(600.0,640.0),"cost":None,
