@@ -93,7 +93,7 @@ def generate_fortune(date_str):
 - 股票建議要結合財帛宮天機化忌（財運波動、靠分析）和大限官祿宮（事業旺）
 - 語氣要溫暖但實用，像朋友提醒一樣"""
 
-    return call_claude(prompt)
+    return prompt
 
 def send_telegram(text):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
