@@ -51,6 +51,7 @@ def get_taiwan_tomorrow():
     return tomorrow.strftime("%Y年%m月%d日（%A）")
 
 def call_gemini(prompt):
+    import time
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
@@ -61,10 +62,19 @@ def call_gemini(prompt):
         "generationConfig": {"maxOutputTokens": 800, "temperature": 0.7}
     }).encode()
 
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read())
-        return result["candidates"][0]["content"]["parts"][0]["text"]
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read())
+                return result["candidates"][0]["content"]["parts"][0]["text"]
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 2:
+                wait = (attempt + 1) * 30
+                print(f"Rate limit，等待 {wait} 秒後重試...")
+                time.sleep(wait)
+            else:
+                raise
 
 def generate_fortune(date_str):
     prompt = f"""你是一位精通紫微斗數的命理師，請根據以下命盤為主人分析{date_str}的運勢。
