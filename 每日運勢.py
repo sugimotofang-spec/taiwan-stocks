@@ -53,7 +53,7 @@ def get_taiwan_tomorrow():
 def call_gemini(prompt):
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     )
     headers = {"Content-Type": "application/json"}
     body = json.dumps({
