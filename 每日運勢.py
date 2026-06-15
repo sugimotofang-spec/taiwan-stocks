@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-印和闐 每日運勢分析
-每晚 21:00 自動執行，分析隔天運勢並發送到 Telegram
+印和闐 每日運勢分析（干支五行規則版）
+每晚 21:00 自動執行，發送隔天運勢到 Telegram
 """
 
 import os, sys, json, urllib.request, urllib.parse
@@ -10,106 +10,147 @@ from datetime import datetime, timedelta, timezone
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# 命盤資料（正確版本 — 科技紫微網）
-BIRTH_CHART = """
-姓名：枋立忠（杉本芳）
-生辰：西元1978年02月10日 戌時
-農曆：戊午年正月初四 戌時
-陽男 土5局 生肖馬
+# ── 天干地支 ──────────────────────────────────────────────────────────────────
+TIANGAN = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"]
+DIZHI   = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"]
 
-命宮（辰）：太陰.陷（化權）、陀羅.廟、左輔
-財帛宮：天機.廟（化忌）、文昌.得、天姚
-官祿宮（申）：天同.旺、天梁.陷、天馬 ← 大限庚申45-54歲（2023-2032年）
-遷移宮（酉）：武曲.利、七殺.旺、地劫
-父母宮（巳）：廉貞.陷、貪狼.陷祿、祿存.廟
-福德宮（午）：巨門.旺、擎羊.陷
-田宅宮（未）：天相.得
-子女宮（丑）：紫微.廟、破軍.旺
-夫妻宮（寅）：文曲.平
-兄弟宮（卯）：天府.得、天官、天德
-疾厄宮（戌）：太陽.不、右弼科
+TG_WUXING = {"甲":"木","乙":"木","丙":"火","丁":"火","戊":"土","己":"土",
+              "庚":"金","辛":"金","壬":"水","癸":"水"}
+DZ_WUXING = {"子":"水","丑":"土","寅":"木","卯":"木","辰":"土","巳":"火",
+              "午":"火","未":"土","申":"金","酉":"金","戌":"土","亥":"水"}
 
-命主：廉貞 / 身主：火星
+def get_ganzhi(date):
+    # 以 1900/1/31 為甲子日（JD基準）
+    base = datetime(1900, 1, 31)
+    delta = (date - base).days
+    tg = TIANGAN[delta % 10]
+    dz = DIZHI[delta % 12]
+    return tg, dz
 
-2026丙午年四化：
-- 天同化祿 → 官祿宮（事業大旺）
-- 天機化權 → 財帛宮（本命忌+流年權，財運波動有掌控力）
-- 文昌化科 → 財帛宮（分析判斷力強）
-- 廉貞化忌 → 父母宮（注意長官關係）
+def get_year_ganzhi(year):
+    tg = TIANGAN[(year - 4) % 10]
+    dz = DIZHI[(year - 4) % 12]
+    return tg, dz
 
-目前狀態：大限官祿宮（45-54歲），事業財運黃金期
-"""
+# ── 命盤資料 ──────────────────────────────────────────────────────────────────
+# 命宮辰：太陰（水）・陀羅（金）
+# 財帛宮：天機（木）化忌，文昌（金）
+# 官祿宮：天同（水）・天梁，大限官祿旺
+# 遷移宮：武曲（金）・七殺
 
-def get_taiwan_tomorrow():
-    tz = timezone(timedelta(hours=8))
-    now = datetime.now(tz)
-    tomorrow = now + timedelta(days=1)
-    return tomorrow.strftime("%Y年%m月%d日（%A）")
+# 對你有利的五行（金生水，水為命宮太陰，金為陀羅）
+FAVORABLE   = {"金", "水"}
+UNFAVORABLE = {"火"}   # 火剋金，火剋水，需謹慎
 
-def call_gemini(prompt):
-    import time
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.0-flash-lite:generateContent"
-    )
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
+# 五行對應幸運色
+WUXING_COLORS = {
+    "木": ("綠色 / 青色", "生機旺盛，適合主動出擊"),
+    "火": ("紅色 / 橘色", "活躍但需節制，情緒容易波動"),
+    "土": ("黃色 / 咖啡色", "穩重踏實，守成為主"),
+    "金": ("白色 / 金色 / 銀色", "財氣凝聚，精密佈局的好時機"),
+    "水": ("黑色 / 深藍色 / 深灰", "智慧流動，分析判斷力強"),
+}
+
+# ── 干支組合分析 ──────────────────────────────────────────────────────────────
+def analyze_day(tg, dz, year_tg):
+    tg_wx = TG_WUXING[tg]
+    dz_wx = DZ_WUXING[dz]
+
+    # 判斷整體吉凶
+    favorable_count = sum(1 for w in [tg_wx, dz_wx] if w in FAVORABLE)
+    unfavorable_count = sum(1 for w in [tg_wx, dz_wx] if w in UNFAVORABLE)
+
+    # 幸運色：優先取對你有利的五行
+    if tg_wx in FAVORABLE:
+        lucky_wx = tg_wx
+    elif dz_wx in FAVORABLE:
+        lucky_wx = dz_wx
+    else:
+        lucky_wx = tg_wx
+    lucky_color, lucky_reason = WUXING_COLORS[lucky_wx]
+
+    # 評分 1-5
+    score = 3 + favorable_count - unfavorable_count
+    score = max(1, min(5, score))
+    stars = "⭐" * score + "☆" * (5 - score)
+
+    # 注意事項
+    warnings = []
+    stock_tips = []
+
+    if "火" in [tg_wx, dz_wx]:
+        warnings.append("今日火旺剋金水，財帛宮天機忌容易衝動，切忌臨時改變操作計畫")
+        stock_tips.append("📉 避免追高買進，等回到甜甜區再動手")
+    else:
+        warnings.append("財帛宮天機化忌提醒：分析要充分，不要靠感覺下單")
+
+    if "金" in [tg_wx, dz_wx]:
+        warnings.append("金系能量強，陀羅財庫共鳴，精密佈局有利")
+        stock_tips.append("💰 金系設備股（家碩、群翊、迅得）今日特別有利，可留意")
+    elif "水" in [tg_wx, dz_wx]:
+        warnings.append("水系旺，命宮太陰共鳴，判斷力清晰，適合覆盤與規劃")
+        stock_tips.append("📊 今日適合做功課、覆盤持股，大限官祿旺，長線方向不變")
+    elif "木" in [tg_wx, dz_wx]:
+        warnings.append("木生火，情緒容易受消息影響，保持冷靜")
+        stock_tips.append("📋 觀察為主，不急於進場，等強勢訊號再行動")
+    elif "土" in [tg_wx, dz_wx]:
+        warnings.append("土日穩健，適合守倉不動，避免頻繁換股")
+        stock_tips.append("🏦 今日適合持倉不動，等待趨勢明朗再決策")
+
+    # 大限提示（官祿宮旺，常態提醒）
+    stock_tips.append("🎯 大限官祿宮（45-54歲）持續旺盛，長線佈局方向正確，短線波動不用慌")
+
+    return {
+        "score": score,
+        "stars": stars,
+        "tg_wx": tg_wx,
+        "dz_wx": dz_wx,
+        "lucky_color": lucky_color,
+        "lucky_reason": lucky_reason,
+        "warnings": warnings,
+        "stock_tips": stock_tips,
     }
-    body = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 800, "temperature": 0.7}
-    }).encode()
 
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read())
-                return result["candidates"][0]["content"]["parts"][0]["text"]
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 503) and attempt < 2:
-                wait = (attempt + 1) * 30
-                print(f"Rate limit (HTTP {e.code})，等待 {wait} 秒後重試...")
-                time.sleep(wait)
-            else:
-                body_text = e.read().decode("utf-8", errors="ignore")
-                print(f"HTTP {e.code} 詳細錯誤：{body_text}")
-                raise
+# ── 生成訊息 ──────────────────────────────────────────────────────────────────
+def generate_message(target_date):
+    tg, dz = get_ganzhi(target_date)
+    year_tg, year_dz = get_year_ganzhi(target_date.year)
+    result = analyze_day(tg, dz, year_tg)
 
-def generate_fortune(date_str):
-    prompt = f"""你是一位精通紫微斗數的命理師，請根據以下命盤為主人分析{date_str}的運勢。
+    weekdays = ["週一","週二","週三","週四","週五","週六","週日"]
+    weekday = weekdays[target_date.weekday()]
+    date_str = target_date.strftime(f"%Y年%m月%d日（{weekday}）")
+    ganzhi_str = f"{year_tg}{year_dz}年 {tg}{dz}日"
 
-{BIRTH_CHART}
+    lines = [
+        f"🌅 <b>印和闐 {date_str} 每日運勢</b>",
+        f"<i>{ganzhi_str}　天干{result['tg_wx']} / 地支{result['dz_wx']}</i>",
+        f"今日能量：{result['stars']}",
+        "─────────────────",
+        f"🎨 <b>幸運色</b>：{result['lucky_color']}",
+        f"💡 {result['lucky_reason']}",
+        "",
+        "⚠️ <b>今日注意</b>：",
+    ]
+    for w in result["warnings"]:
+        lines.append(f"• {w}")
 
-請用繁體中文，依照以下格式輸出（不要多餘說明，直接輸出內容）：
+    lines += ["", "📈 <b>股票操作心態</b>："]
+    for t in result["stock_tips"]:
+        lines.append(f"• {t}")
 
-🌅 <b>{date_str} 每日運勢</b>
+    lines += [
+        "",
+        "─────────────────",
+        "🌙 命宮太陰水・陀羅金，財帛天機忌提醒：<b>紀律操作，甜甜區才動手</b>",
+    ]
 
-🎨 <b>幸運色</b>：[顏色名稱]
-💡 說明：[一句話說明為何這個顏色今天有利，與命盤哪個星宿有關]
+    return "\n".join(lines)
 
-⚠️ <b>今日注意</b>：
-• [注意事項1，約25字]
-• [注意事項2，約25字]
-
-📈 <b>股票操作心態</b>：
-• [心態建議1，結合命盤財帛宮天機忌特性，約30字]
-• [心態建議2，具體可操作的建議，約30字]
-
-🌙 <b>今日總評</b>：[一句話總結，30字以內]
-
-注意：
-- 幸運色要根據當天天干地支五行來判斷
-- 股票建議要結合財帛宮天機化忌（財運波動、靠分析）和大限官祿宮（事業旺）
-- 語氣要溫暖但實用，像朋友提醒一樣"""
-
-    return prompt
-
+# ── 發送 Telegram ─────────────────────────────────────────────────────────────
 def send_telegram(text):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("未設定 Telegram 環境變數，印出到 stdout：")
@@ -117,8 +158,8 @@ def send_telegram(text):
         return
 
     data = urllib.parse.urlencode({
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text,
+        "chat_id":    TELEGRAM_CHAT_ID,
+        "text":       text,
         "parse_mode": "HTML",
     }).encode()
 
@@ -133,18 +174,15 @@ def send_telegram(text):
         else:
             print("❌ 發送失敗:", result)
 
+# ── 主程式 ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if not GEMINI_API_KEY:
-        print("❌ 未設定 GEMINI_API_KEY，請設定環境變數或 GitHub Secret")
-        sys.exit(1)
+    tz = timezone(timedelta(hours=8))
+    now = datetime.now(tz)
+    tomorrow = (now + timedelta(days=1)).replace(tzinfo=None)
+    target = datetime(tomorrow.year, tomorrow.month, tomorrow.day)
 
-    date_str = get_taiwan_tomorrow()
-    print(f"正在生成 {date_str} 運勢分析...")
-
-    try:
-        fortune_text = call_gemini(generate_fortune(date_str))
-        print("運勢生成完成，發送 Telegram...")
-        send_telegram(fortune_text)
-    except Exception as e:
-        print(f"❌ 錯誤：{e}")
-        sys.exit(1)
+    print(f"正在生成 {target.strftime('%Y/%m/%d')} 運勢...")
+    msg = generate_message(target)
+    print(msg)
+    print("─" * 30)
+    send_telegram(msg)
