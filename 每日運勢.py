@@ -54,7 +54,7 @@ def call_gemini(prompt):
     import time
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-1.5-flash-8b:generateContent"
+        "gemini-2.0-flash-lite:generateContent"
     )
     headers = {
         "Content-Type": "application/json",
