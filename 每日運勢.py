@@ -54,9 +54,12 @@ def call_gemini(prompt):
     import time
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        "gemini-2.0-flash:generateContent"
     )
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+    }
     body = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 800, "temperature": 0.7}
@@ -69,11 +72,13 @@ def call_gemini(prompt):
                 result = json.loads(resp.read())
                 return result["candidates"][0]["content"]["parts"][0]["text"]
         except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < 2:
+            if e.code in (429, 503) and attempt < 2:
                 wait = (attempt + 1) * 30
-                print(f"Rate limit，等待 {wait} 秒後重試...")
+                print(f"Rate limit (HTTP {e.code})，等待 {wait} 秒後重試...")
                 time.sleep(wait)
             else:
+                body_text = e.read().decode("utf-8", errors="ignore")
+                print(f"HTTP {e.code} 詳細錯誤：{body_text}")
                 raise
 
 def generate_fortune(date_str):
