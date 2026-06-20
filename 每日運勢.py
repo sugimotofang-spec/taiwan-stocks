@@ -92,7 +92,7 @@ def analyze_day(tg, dz, year_tg):
 
     if "金" in [tg_wx, dz_wx]:
         warnings.append("陀羅命宮金系共鳴，精密設備股今日能量強")
-        stock_tips.append("💰 金系設備股（家碩、群翊、迅得、友威科）今日特別有利")
+        stock_tips.append("💰 本命金系股（長虹・協易機）陀羅/武曲命宮共鳴，今日精密佈局最有利")
     elif "水" in [tg_wx, dz_wx]:
         warnings.append("太陰命宮水系共鳴，策略思維清晰，適合覆盤與規劃")
         stock_tips.append("📊 今日適合做功課、整理持倉邏輯，長線佈局方向再確認")

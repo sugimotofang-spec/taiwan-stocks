@@ -120,6 +120,8 @@ def get_zone(price, sweet, entry, target, holding=True):
         return "below_sweet"
     elif sl <= price <= sh:
         return "sweet"
+    elif sh < price < el:          # 甜甜區上限～入手下限之間的空白地帶
+        return "normal_hold" if holding else "normal_watch"
     elif el <= price <= eh:
         return "entry"
     elif eh < price < tl:
