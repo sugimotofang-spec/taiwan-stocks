@@ -1,0 +1,32 @@
+name: 盤中即時提醒
+
+on:
+  schedule:
+    # 台灣時間 09:30 / 11:30 / 13:20 = UTC 01:30 / 03:30 / 05:20，週一到週五
+    - cron: '30 1 * * 1-5'
+    - cron: '30 3 * * 1-5'
+    - cron: '20 5 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  intraday-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 取出程式碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+
+      - name: 檢查盤中價位，命中甜甜區/目標區才通知
+        run: python intraday_alert.py
+        env:
+          CI: "true"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
