@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="下單檢查">
+<meta name="theme-color" content="#0a0f1e">
+<title>下單前檢查 | 印和闐</title>
+<style>
+  :root {
+    --bg:#0a0f1e; --surface:#111827; --surface2:#1e293b;
+    --border:#1e293b; --text:#e2e8f0; --muted:#64748b;
+    --gold:#fbbf24; --sky:#7dd3fc;
+    --ok:#22c87a; --warn:#f5a020; --danger:#e84545;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html { font-size:16px; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:'PingFang TC','Microsoft JhengHei','Segoe UI',sans-serif;
+    min-height:100vh; padding:20px 16px 48px;
+    padding-top:calc(20px + env(safe-area-inset-top));
+    padding-bottom:calc(48px + env(safe-area-inset-bottom));
+  }
+  h1 { font-size:1.15rem; color:var(--gold); letter-spacing:1px; font-weight:800; margin-bottom:2px; }
+  .subtitle { color:var(--muted); font-size:0.75rem; margin-bottom:20px; }
+
+  .field { margin-bottom:16px; }
+  label { display:block; font-size:0.75rem; color:var(--muted); letter-spacing:0.5px; margin-bottom:6px; text-transform:uppercase; }
+
+  select, input[type="number"] {
+    width:100%; background:var(--surface); border:1px solid var(--border);
+    color:var(--text); border-radius:10px; padding:14px 12px;
+    font-size:1.05rem; font-family:inherit; -webkit-appearance:none; appearance:none;
+  }
+  select:focus, input:focus { outline:none; border-color:var(--sky); }
+
+  .stock-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+  .stock-btn {
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    border-radius:10px; padding:12px 10px; font-size:0.9rem; text-align:left;
+    font-family:inherit; cursor:pointer;
+  }
+  .stock-btn .code { color:var(--muted); font-size:0.7rem; display:block; }
+  .stock-btn.selected { border-color:var(--gold); background:#20180a; }
+  .group-label { font-size:0.7rem; color:var(--muted); letter-spacing:2px; margin:14px 0 8px; }
+
+  button.check-btn {
+    width:100%; background:var(--gold); color:#1a1200; border:none;
+    border-radius:12px; padding:16px; font-size:1.05rem; font-weight:800;
+    letter-spacing:1px; margin-top:6px; font-family:inherit;
+  }
+  button.check-btn:active { opacity:0.8; }
+
+  .result { margin-top:20px; display:none; }
+  .result.show { display:block; animation:fade .2s ease; }
+  @keyframes fade { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  .result-card {
+    border-radius:14px; padding:20px 18px; border:1px solid var(--border);
+    background:var(--surface);
+  }
+  .result-card.ok { border-color:var(--ok); background:#0d1f16; }
+  .result-card.warn { border-color:var(--warn); background:#221a0a; }
+  .result-card.danger { border-color:var(--danger); background:#240f0f; }
+
+  .zone-title { font-size:1.3rem; font-weight:800; margin-bottom:6px; }
+  .zone-msg { font-size:0.9rem; color:var(--text); opacity:0.9; line-height:1.5; }
+  .zone-verdict { font-size:1rem; font-weight:800; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08); }
+  .verdict-ok { color:var(--ok); }
+  .verdict-no { color:var(--danger); }
+
+  .range-info {
+    margin-top:14px; font-size:0.78rem; color:var(--muted);
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;
+  }
+  .range-info div { background:var(--surface2); border-radius:8px; padding:8px 6px; text-align:center; }
+  .range-info b { display:block; color:var(--text); font-size:0.82rem; margin-top:2px; }
+
+  .risk-tag {
+    display:inline-block; margin-top:10px; font-size:0.72rem;
+    background:#3a1414; color:#ff8080; padding:4px 10px; border-radius:20px;
+  }
+
+  .footer-link {
+    display:block; text-align:center; margin-top:28px; color:var(--sky);
+    font-size:0.8rem; text-decoration:none;
+  }
+  .footer-note { text-align:center; color:var(--border); font-size:0.7rem; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<h1>🔒 下單前檢查</h1>
+<div class="subtitle">紀律鎖：只有甜甜區和入手區可以買</div>
+
+<div class="field">
+  <label>選擇股票</label>
+  <div id="stockGrid" class="stock-grid"></div>
+</div>
+
+<div class="field">
+  <label>想買的價格</label>
+  <input type="number" id="priceInput" inputmode="decimal" placeholder="輸入現價" step="0.01">
+</div>
+
+<button class="check-btn" onclick="doCheck()">檢查</button>
+
+<div class="result" id="result">
+  <div class="result-card" id="resultCard">
+    <div class="zone-title" id="zoneTitle"></div>
+    <div class="zone-msg" id="zoneMsg"></div>
+    <div class="risk-tag" id="riskTag" style="display:none">⚠️ 七殺/地劫屬性，追高代價更大</div>
+    <div class="range-info">
+      <div>甜甜區<b id="rSweet"></b></div>
+      <div>入手區<b id="rEntry"></b></div>
+      <div>目標區<b id="rTarget"></b></div>
+    </div>
+    <div class="zone-verdict" id="zoneVerdict"></div>
+  </div>
+</div>
+
+<a class="footer-link" href="./index.html">← 回台股藏金閣儀表板</a>
+<div class="footer-note">甜甜區才動手</div>
+
+<script>
+const STOCKS = [{"code": "5534", "name": "長虹", "group": "一軍", "role": "🏠 資產金庫", "ex": "tse", "holding": true, "sweet": [68.0, 70.5], "entry": [71.0, 73.5], "target": [88.0, 95.0], "cost": 84.07, "memo": "2026 ICT大樓+虹創科技大樓完工，預估淨值衝破 100"}, {"code": "4533", "name": "協易機", "group": "一軍", "role": "🦾 重裝主力", "ex": "otc", "holding": true, "sweet": [28.5, 30.0], "entry": [30.5, 32.0], "target": [38.0, 42.0], "cost": 29.09, "memo": "伺服沖床主力，跌破 30 用力撿"}, {"code": "3455", "name": "由田", "group": "一軍", "role": "⚔️ 七殺爆量遊擊隊【地劫⚠️】", "ex": "otc", "holding": true, "sweet": [215.0, 225.0], "entry": [228.0, 240.0], "target": [290.0, 310.0], "cost": 242.5, "memo": "AOI 檢測設備，TSMC 自主產線指定廠商，七殺爆量型，嚴禁追高"}, {"code": "3587", "name": "閎康", "group": "一軍", "role": "🌀 天機智慧策略股", "ex": "otc", "holding": true, "sweet": [295.0, 308.0], "entry": [312.0, 326.0], "target": [390.0, 420.0], "cost": 339.53, "memo": "AI ASIC 可靠度分析，天機遷移智識型，2026 EPS 估 11-13，日本第四實驗室 Q3 開幕"}, {"code": "6438", "name": "迅得", "group": "一軍", "role": "⚡ 變動殺手", "ex": "tse", "holding": true, "sweet": [160.0, 167.0], "entry": [168.0, 174.0], "target": [208.0, 222.0], "cost": 178.16, "memo": "FOUP Stocker 家登默契夥伴，半導體設備佔比拉至 50%，EPS 估 9-10"}, {"code": "3580", "name": "友威科", "group": "一軍", "role": "🌙 太陰財庫", "ex": "otc", "holding": true, "sweet": [90.0, 97.0], "entry": [98.0, 103.0], "target": [120.0, 130.0], "cost": 111.04, "memo": "電漿/濺鍍輔助設備，玻璃基板 E-core 2026 H2 受惠，低風險穩健"}, {"code": "6196", "name": "帆宣", "group": "二軍", "role": "🛡️ 太陰防禦", "ex": "tse", "holding": false, "sweet": [460.0, 480.0], "entry": [485.0, 508.0], "target": [600.0, 640.0], "cost": null, "memo": "在手訂單 910 億排至 2027，化學品供應 + AIM Bonder，EPS 估 18-20"}, {"code": "2467", "name": "志聖", "group": "二軍", "role": "🦾 武曲備案", "ex": "tse", "holding": false, "sweet": [555.0, 580.0], "entry": [585.0, 612.0], "target": [730.0, 780.0], "cost": null, "memo": "TSMC-like 產線 Bonder/除泡烘烤設備，CoWoS 擴產直接受惠"}, {"code": "5425", "name": "台半", "group": "二軍", "role": "裝甲護衛", "ex": "otc", "holding": false, "sweet": [103.0, 109.0], "entry": [110.0, 115.5], "target": [138.0, 148.0], "cost": null, "memo": "離散功率元件，車用工控復甦，拉回月線接"}, {"code": "3693", "name": "營邦", "group": "二軍", "role": "重裝主力(核心)", "ex": "otc", "holding": false, "sweet": [510.0, 538.0], "entry": [542.0, 575.0], "target": [690.0, 730.0], "cost": null, "memo": "NVIDIA 指定 AI 儲存機櫃，EPS 挑戰 25-30"}, {"code": "1560", "name": "中砂", "group": "二軍", "role": "🌀 陀羅備案", "ex": "tse", "holding": false, "sweet": [645.0, 672.0], "entry": [675.0, 710.0], "target": [855.0, 900.0], "cost": null, "memo": "Intel 18A 鑽石碟供貨比重 30%，隨 Intel 18A 爬坡大漲"}, {"code": "3357", "name": "臺慶科", "group": "二軍", "role": "🌀 陀羅觀察", "ex": "otc", "holding": false, "sweet": [258.0, 270.0], "entry": [273.0, 284.0], "target": [343.0, 368.0], "cost": null, "memo": "TLVR 電感通過認證，2026H2 開始出貨，EPS 估 13.5，營收美國佔 73%"}, {"code": "2421", "name": "建準", "group": "二軍", "role": "🌀 陀羅風神", "ex": "tse", "holding": false, "sweet": [143.0, 150.0], "entry": [152.0, 158.0], "target": [188.0, 200.0], "cost": null, "memo": "AI 伺服器散熱風扇，電子備案，磨完會飛"}, {"code": "2062", "name": "橋椿", "group": "二軍", "role": "🛡️🌀 防禦金盾", "ex": "tse", "holding": false, "sweet": [16.8, 17.8], "entry": [17.9, 18.7], "target": [22.0, 23.5], "cost": null, "memo": "鋅壓鑄水龍頭，避風港型，賺 15% 就很棒"}, {"code": "3004", "name": "豐達科", "group": "二軍", "role": "👑🌀 本命核心", "ex": "tse", "holding": false, "sweet": [110.0, 116.0], "entry": [117.0, 123.0], "target": [148.0, 158.0], "cost": null, "memo": "航太螺絲，SPS Technologies 火災轉單，Boeing 爬坡，EPS 估 9.5"}, {"code": "5222", "name": "全訊", "group": "二軍", "role": "⚔️ 七殺戰神【地劫⚠️】", "ex": "tse", "holding": false, "sweet": [114.0, 119.0], "entry": [120.0, 126.0], "target": [150.0, 160.0], "cost": null, "memo": "軍工 PA，國防部唯一供應商，逢低補"}, {"code": "3131", "name": "弘塑", "group": "二軍", "role": "⚡ 七殺先鋒【地劫⚠️】", "ex": "otc", "holding": false, "sweet": [3050, 3200], "entry": [3230, 3420], "target": [4200, 4600], "cost": null, "memo": "高階濕製程設備霸主，CoWoS/TSMC-like 產線核心，七殺爆發"}, {"code": "8027", "name": "鈦昇", "group": "二軍", "role": "⚡ 破軍黑馬", "ex": "otc", "holding": false, "sweet": [228.0, 242.0], "entry": [245.0, 257.0], "target": [315.0, 345.0], "cost": null, "memo": "Intel EMIB 獨家雷射設備，2026 出貨拉曼光譜儀用於 Intel 14A 背面供電"}, {"code": "4958", "name": "臻鼎-KY", "group": "二軍", "role": "⚡ 破軍觀察", "ex": "tse", "holding": false, "sweet": [460.0, 480.0], "entry": [485.0, 512.0], "target": [618.0, 658.0], "cost": null, "memo": "SLP 類載板龍頭，CoWoP 送樣測試，NVIDIA VR200 運算主板"}, {"code": "6937", "name": "天虹", "group": "二軍", "role": "⚡ 破軍主攻", "ex": "tse", "holding": false, "sweet": [270.0, 284.0], "entry": [287.0, 300.0], "target": [362.0, 385.0], "cost": null, "memo": "PVD/ALD 設備國產化，打破美商壟斷，台積電供應鏈新星"}, {"code": "8096", "name": "擎亞", "group": "二軍", "role": "⚡ 突擊尖兵", "ex": "otc", "holding": false, "sweet": [108.0, 114.0], "entry": [116.0, 122.0], "target": [148.0, 160.0], "cost": null, "memo": "記憶體與 AI 通路，台積電資料中心受惠，嚴禁追高"}];
+let selected = null;
+
+function renderGrid() {
+  const grid = document.getElementById('stockGrid');
+  const groups = {};
+  STOCKS.forEach(s => { (groups[s.group] = groups[s.group] || []).push(s); });
+  let html = '';
+  Object.keys(groups).forEach(g => {
+    html += `<div class="group-label" style="grid-column:1/-1">${g}</div>`;
+    groups[g].forEach(s => {
+      html += `<button class="stock-btn" data-code="${s.code}" onclick="selectStock('${s.code}')">
+                 ${s.name}<span class="code">${s.code}</span>
+               </button>`;
+    });
+  });
+  grid.innerHTML = html;
+}
+
+function selectStock(code) {
+  selected = STOCKS.find(s => s.code === code);
+  document.querySelectorAll('.stock-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.code === code);
+  });
+  document.getElementById('result').classList.remove('show');
+}
+
+function checkZone(price, s) {
+  const [sl, sh] = s.sweet, [el, eh] = s.entry, [tl, th] = s.target;
+  if (price < sl)      return ['🔥 超甜區', `低於甜甜區下限 ${sl}，超值價，紀律內可買`, true, 'ok'];
+  if (price <= sh)      return ['🍬 甜甜區', `在甜甜區 ${sl}–${sh} 內，紀律內可買`, true, 'ok'];
+  if (price < el)       return ['⬜ 空白地帶', `介於甜甜區上限 ${sh} 與入手區下限 ${el} 之間，等回落再買`, false, 'warn'];
+  if (price <= eh)       return ['🎯 入手區', `在入手區 ${el}–${eh} 內，可買但不是最優價`, true, 'ok'];
+  if (price < tl) {
+    const pct = ((price - eh) / eh * 100).toFixed(1);
+    return ['🚫 追高區', `高於入手區上限 ${eh} 達 ${pct}%，地劫警示：禁止買進`, false, 'danger'];
+  }
+  if (price <= th)       return ['🎯 目標區', `已達目標區 ${tl}–${th}，該想的是賣不是買`, false, 'warn'];
+  return ['🚀 超過目標', `已超過目標區上限 ${th}，絕對禁止追高`, false, 'danger'];
+}
+
+function doCheck() {
+  if (!selected) { alert('請先選擇股票'); return; }
+  const price = parseFloat(document.getElementById('priceInput').value);
+  if (isNaN(price)) { alert('請輸入價格'); return; }
+
+  const [zone, msg, ok, level] = checkZone(price, selected);
+  const card = document.getElementById('resultCard');
+  card.className = 'result-card ' + level;
+
+  document.getElementById('zoneTitle').textContent = `${selected.name}　${zone}`;
+  document.getElementById('zoneMsg').textContent = msg;
+  document.getElementById('rSweet').textContent = selected.sweet.join('–');
+  document.getElementById('rEntry').textContent = selected.entry.join('–');
+  document.getElementById('rTarget').textContent = selected.target.join('–');
+
+  const verdict = document.getElementById('zoneVerdict');
+  verdict.textContent = ok ? '✅ 紀律內，可以買' : '🔒 紀律鎖：這個價位不買';
+  verdict.className = 'zone-verdict ' + (ok ? 'verdict-ok' : 'verdict-no');
+
+  const risk = document.getElementById('riskTag');
+  risk.style.display = (selected.role.includes('七殺') || selected.role.includes('地劫')) ? 'inline-block' : 'none';
+
+  document.getElementById('result').classList.add('show');
+  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+renderGrid();
+</script>
+</body>
+</html>

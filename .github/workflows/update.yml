@@ -31,6 +31,9 @@ jobs:
         env:
           CI: "true"
 
+      - name: 產生手機版下單前檢查頁面 check.html
+        run: python generate_check_page.py
+
       - name: 將 index.html 推送到 gh-pages 分支
         uses: peaceiris/actions-gh-pages@v4
         with:
