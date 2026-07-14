@@ -6,7 +6,7 @@
 """
 
 import os, sys, json, urllib.request, urllib.parse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -56,6 +56,30 @@ WUXING_COLORS = {
     "金": ("白色 / 金色 / 銀色", "陀羅命宮共鳴，精密佈局最有利"),
     "水": ("黑色 / 深藍色 / 深灰", "太陰命宮共鳴，策略清晰，分析判斷力最強"),
 }
+
+# ── 2026丙午年 流月運勢（來源：2026丙午年流年運勢分析.html）───────────────────
+# 日期區間為國曆概算（±3日），實際以農曆為準
+MONTH_FORTUNE = [
+    (date(2026, 2, 17), date(2026, 3, 18),  "正月", "午・武曲",       "★★★★☆", "🔵 穩健持倉", "武曲正財旺，甜甜區可分批買入本命股，新年最強開局月"),
+    (date(2026, 3, 19), date(2026, 4, 17),  "二月", "巳・太陽",       "★★★★☆", "🔵 穩健持倉", "貴人月，人脈為主。持倉守穩，等甜甜區機會"),
+    (date(2026, 4, 18), date(2026, 5, 16),  "三月", "辰・太陰化權+陀羅", "★★★★★", "🟢 積極佈局", "本命命宮月★全年判斷力最強，逢甜甜區可大膽分批買入"),
+    (date(2026, 5, 17), date(2026, 6, 15),  "四月", "卯・空宮(天同梁)", "★★★☆☆", "🟡 觀察等待", "守成月，判斷力較弱，以觀察為主不主動加碼"),
+    (date(2026, 6, 16), date(2026, 7, 14),  "五月", "寅・廉貞化忌+貪狼化祿", "★★☆☆☆", "🔴 嚴格守倉", "⚠️全年最高警戒！只持倉不加碼不新進場，市場越誘人越要停下來想三秒"),
+    (date(2026, 7, 15), date(2026, 8, 12),  "六月", "丑・巨門",       "★★★☆☆", "🟡 觀察等待", "化忌月剛過的轉折回升月，觀察為主，不急著加碼"),
+    (date(2026, 8, 13), date(2026, 9, 11),  "七月", "子・空宮(太陽巨門)", "★★★☆☆", "🟡 觀察等待", "本命財帛宮月，做足功課看清底部，備戰九月積極佈局"),
+    (date(2026, 9, 12), date(2026, 10, 11), "八月", "亥・天相+天鉞",   "★★★★☆", "🔵 穩健持倉", "貴人月，天鉞加持，甜甜區可適度加碼，天相穩守不冒進"),
+    (date(2026, 10, 12), date(2026, 11, 9), "九月", "戌・天機化權+右弼", "★★★★★", "🟢 積極佈局", "下半年最強月★天機化權遷移，逢甜甜區積極加碼，甜甜區才動不追高"),
+    (date(2026, 11, 10), date(2026, 12, 8), "十月", "酉・紫微+破軍",   "★★★★☆", "🔵 穩健持倉", "破軍系股票（迅得等）逢甜甜區較佳進場窗口，紫微穩守不衝動"),
+    (date(2026, 12, 9), date(2027, 1, 7),   "十一月", "申・七殺+地劫", "★★☆☆☆", "🔴 嚴格守倉", "⚠️第二高警戒！七殺衝動+地劫等待，持倉不動嚴禁追高"),
+    (date(2027, 1, 8), date(2027, 2, 4),    "十二月", "未・天同化祿+天梁", "★★★★☆", "🔵 穩健持倉", "資產收益月，適合年度盈虧結算，部分利潤可考慮落袋"),
+]
+
+def get_month_fortune(target_date):
+    d = target_date.date() if hasattr(target_date, "date") else target_date
+    for start, end, name, palace, score, tag, note in MONTH_FORTUNE:
+        if start <= d <= end:
+            return {"name": name, "palace": palace, "score": score, "tag": tag, "note": note}
+    return None
 
 # ── 干支組合分析 ──────────────────────────────────────────────────────────────
 def analyze_day(tg, dz, year_tg):
@@ -122,6 +146,7 @@ def generate_message(target_date):
     tg, dz = get_ganzhi(target_date)
     year_tg, year_dz = get_year_ganzhi(target_date.year)
     result = analyze_day(tg, dz, year_tg)
+    month = get_month_fortune(target_date)
 
     weekdays = ["週一","週二","週三","週四","週五","週六","週日"]
     weekday = weekdays[target_date.weekday()]
@@ -144,6 +169,15 @@ def generate_message(target_date):
     lines += ["", "📈 <b>股票操作心態</b>："]
     for t in result["stock_tips"]:
         lines.append(f"• {t}")
+
+    if month:
+        lines += [
+            "",
+            "─────────────────",
+            f"🗓 <b>農曆{month['name']}</b>（流月命宮：{month['palace']}）　{month['score']}",
+            f"操作節奏：<b>{month['tag']}</b>",
+            f"💬 {month['note']}",
+        ]
 
     lines += [
         "",
