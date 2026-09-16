@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 盤中即時提醒
-由 GitHub Actions 在開盤時段（09:30 / 11:30 / 13:20）定時執行
+由 GitHub Actions 每天 14:30（收盤後）定時執行一次
 只有命中「甜甜區以下」或「目標區以上」才發送 Telegram，其餘狀況靜默不通知
 """
 import os, sys
