@@ -8,8 +8,8 @@
     python sync_stocks.py --dry-run  # 只印出結果，不寫回 每日追價.py
 
 規則：
-- 只納入 xlsx 工作表1 的「一軍」「二軍」兩個區塊（三軍/探針卡新觀察、玻璃基板候補不納入通知名單）
-- EXTRA_WHITELIST 手動加入不在一軍/二軍、但想額外追蹤的個股（例如揚博）
+- 只納入 xlsx 工作表1 的區塊列在 INCLUDE_SECTIONS 裡的（目前：一軍、三軍；二軍不納入通知名單）
+- EXTRA_WHITELIST 手動加入不在 INCLUDE_SECTIONS 區塊、但想額外追蹤的個股（例如友威科實際持股、揚博）
 - 甜甜價/入手區/滿足點、Sugi筆記（取第一行當 memo）一律以 xlsx 為準覆蓋
 - holding（是否持有）與 cost（實際成本價）不會被 xlsx 覆蓋——因為 xlsx 的「成本價」欄
   多數是空的，不是真實持股紀錄。這兩個欄位永遠沿用 每日追價.py 裡舊的值，新股預設
@@ -20,11 +20,13 @@ import os, re, glob, ast, ex_market_map
 BASE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT_PATH = os.path.join(BASE, "每日追價.py")
 
-# 額外白名單：不在 xlsx 一軍/二軍區塊，但想加進通知名單的股票代號
+# 要納入通知名單的 xlsx 區塊（依此順序輸出）
+INCLUDE_SECTIONS = ["一軍", "三軍"]
+
+# 額外白名單：不在 INCLUDE_SECTIONS 區塊、但想加進通知名單的股票代號
 EXTRA_WHITELIST = {
     "2493",  # 揚博科技（使用者指定額外追蹤）
     "3580",  # 友威科（每日追價.py 原本有 cost=111.04 實際持股，防止同步時被誤刪）
-    "6438",  # 迅得（每日追價.py 原本有 cost=178.16 實際持股，防止同步時被誤刪）
 }
 
 
@@ -71,12 +73,15 @@ def extract_from_xlsx(path):
     for r in range(1, ws.max_row + 1):
         a = ws.cell(r, 1).value
         if isinstance(a, str) and ws.cell(r, 2).value is None:
-            if a.strip() in ("一軍", "二軍"):
-                section = a.strip()
-            elif "三軍" in a or "玻璃基板" in a or "下半年新觀察" in a:
-                section = None  # 離開一軍/二軍，之後的列都不納入
+            label = a.strip()
+            if label in ("一軍", "二軍"):
+                section = label
+            elif label.startswith("三軍"):
+                section = "三軍"
+            elif "玻璃基板" in a or "下半年新觀察" in a or "催化劑" in a:
+                section = None  # 離開名單區塊，之後的列都不納入（除非後面又遇到新的區塊標題）
             continue
-        if section not in ("一軍", "二軍"):
+        if section not in INCLUDE_SECTIONS:
             continue
         code = a
         if not (isinstance(code, int) or (isinstance(code, str) and code.isdigit())):
@@ -97,7 +102,8 @@ def extract_from_xlsx(path):
 
 def build_stocks_block(rows, existing, ex_map):
     lines = ["STOCKS = ["]
-    for grp in ("一軍", "二軍"):
+    groups_present = list(dict.fromkeys(r["group"] for r in rows))  # 保留出現順序
+    for grp in groups_present:
         lines.append(f"    # ─ {grp} ─")
         for r in rows:
             if r["group"] != grp:
@@ -137,7 +143,7 @@ def main(dry_run=False):
                 for r in range(1, ws.max_row + 1):
                     if str(ws.cell(r, 1).value) == code:
                         rows.append({
-                            "code": code, "name": ws.cell(r, 2).value, "group": "二軍",
+                            "code": code, "name": ws.cell(r, 2).value, "group": "白名單額外追蹤",
                             "role": (ws.cell(r, 3).value or "") + " ★白名單額外追蹤",
                             "sweet": parse_band(ws.cell(r, 7).value),
                             "entry": parse_band(ws.cell(r, 8).value),
@@ -159,7 +165,10 @@ def main(dry_run=False):
     codes_old = set(existing)
     added = codes_new - codes_old
     removed = codes_old - codes_new
-    print(f"名單筆數: {len(rows)}（一軍 {sum(1 for r in rows if r['group']=='一軍')} + 二軍 {sum(1 for r in rows if r['group']=='二軍')}）")
+    from collections import Counter
+    cnt = Counter(r["group"] for r in rows)
+    breakdown = " + ".join(f"{g} {n}" for g, n in cnt.items())
+    print(f"名單筆數: {len(rows)}（{breakdown}）")
     if added:
         print("新增:", ", ".join(sorted(added)))
     if removed:
