@@ -27,6 +27,12 @@ INCLUDE_SECTIONS = ["一軍", "三軍"]
 EXTRA_WHITELIST = {
     "2493",  # 揚博科技（使用者指定額外追蹤）
     "3580",  # 友威科（每日追價.py 原本有 cost=111.04 實際持股，防止同步時被誤刪）
+    "2404",  # 漢唐（使用者指定額外追蹤）
+}
+
+# 額外排除：即使落在 INCLUDE_SECTIONS 區塊裡，也強制不進通知名單的股票代號
+EXTRA_EXCLUDE = {
+    "5534",  # 長虹（使用者指定不要通知，即使仍在一軍區塊、仍有實際持股）
 }
 
 
@@ -131,6 +137,7 @@ def main(dry_run=False):
     path = latest_config_xlsx()
     print(f"讀取: {os.path.basename(path)}")
     rows = extract_from_xlsx(path)
+    rows = [r for r in rows if r["code"] not in EXTRA_EXCLUDE]
 
     missing = [c for c in EXTRA_WHITELIST if not any(r["code"] == c for r in rows)]
     if missing:
