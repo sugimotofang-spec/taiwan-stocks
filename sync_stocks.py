@@ -26,8 +26,15 @@ INCLUDE_SECTIONS = ["一軍", "三軍"]
 # 額外白名單：不在 INCLUDE_SECTIONS 區塊、但想加進通知名單的股票代號
 EXTRA_WHITELIST = {
     "2493",  # 揚博科技（使用者指定額外追蹤）
-    "3580",  # 友威科（每日追價.py 原本有 cost=111.04 實際持股，防止同步時被誤刪）
     "2404",  # 漢唐（使用者指定額外追蹤）
+}
+
+# 實際持股（依券商庫存畫面，2026/11/06）：代號 → 均價。這裡的代號一律 holding=True、cost=均價，
+# 優先於 xlsx 與 每日追價.py 舊值；賣出後請從這裡移除。
+HOLDINGS = {
+    "2441": 98.67,   # 超豐 500 股
+    "3587": 327.62,  # 閎康 1,315 股
+    "4533": 27.79,   # 協易機 18,000 股
 }
 
 # 額外排除：即使落在 INCLUDE_SECTIONS 區塊裡，也強制不進通知名單的股票代號
@@ -115,8 +122,11 @@ def build_stocks_block(rows, existing, ex_map):
             if r["group"] != grp:
                 continue
             prev = existing.get(r["code"], {})
-            holding = prev.get("holding", grp == "一軍")
-            cost = prev.get("cost")
+            if r["code"] in HOLDINGS:
+                holding, cost = True, HOLDINGS[r["code"]]
+            else:
+                holding = prev.get("holding", False)
+                cost = prev.get("cost")
             ex = ex_map.get(r["code"], "tse")
             cost_repr = "None" if cost is None else repr(cost)
             lines.append(
