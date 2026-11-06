@@ -21,7 +21,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 SCRIPT_PATH = os.path.join(BASE, "每日追價.py")
 
 # 要納入通知名單的 xlsx 區塊（依此順序輸出）
-INCLUDE_SECTIONS = ["一軍", "三軍"]
+INCLUDE_SECTIONS = ["一軍"]
 
 # 額外白名單：不在 INCLUDE_SECTIONS 區塊、但想加進通知名單的股票代號
 EXTRA_WHITELIST = {
